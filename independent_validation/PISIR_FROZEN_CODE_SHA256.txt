@@ -1,0 +1,3 @@
+80d721ec95e66a5f3f70b5aa528661c6bd22c1dd91d748292840ec9e8112a821  frozen_experiment.py
+6a7f2bc571314cbf9c321cc03437691cd4be95c3a6f075e60ff99e8035c704c8  time_series_60min_singleindex.csv
+Design developed on 2019 data. Source checksum and protocol were committed before running 2020 test.
