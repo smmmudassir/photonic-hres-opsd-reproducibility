@@ -1,0 +1,4 @@
+6a91aff09d4f6a4770bfcca013d5efc435ac463301517e60f95477d4c88381ac  src/experiment.py
+6a7f2bc571314cbf9c321cc03437691cd4be95c3a6f075e60ff99e8035c704c8  time_series_60min_singleindex.csv
+1b8017963a2b3076c5c2fcb66691e4b152823ec03760dbf5c4427e0b9380034e  PREREGISTRATION.md
+Code content published after outcome must match exact precommitted source hash. No 2020 test labels have been evaluated before these commits.
