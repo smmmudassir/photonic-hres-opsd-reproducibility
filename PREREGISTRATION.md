@@ -1,0 +1,30 @@
+# Frozen validation protocol (2026-11-01; lock commit must precede execution)
+
+## Data boundary and information status
+- Dataset: original user-supplied OPSD `time_series_60min_singleindex.csv`, checksum in `INPUT_SHA256.txt`. Official published release v2020-10-06.
+- DE and GB_GBN: hourly load actual, PV generation actual, wind generation actual. The source's PV/wind capacity-factor columns are unavailable in 2020, so we deliberately use the *same* 2015-2018 fixed robust scale (the 99th percentile of positive/nonnegative observed historical values) for each national generation and load series. No 2020 labels are used for normalizing, fitting or tuning. Scores from this pipeline cannot be directly compared with the earlier capacity-factor manuscript.
+- Train 2015-01-01 to 2018-12-31. Calibration 2019-01-01 to 2019-12-31 (2019 had previously been viewed, and is not confirmatory). Blind held-out evaluation 2020-01-01 to 2020-09-30. Test series will not be inspected for predictions, error values, control costs, or calibration choices until the protocol and script are committed in the public GitHub repository.
+- Known before lock: row counts and completeness in 2020, but NOT test accuracy, test losses, per-hour target values, or dispatch outcomes.
+
+## Models and frozen hyperparameters
+- Target net load: `1.25*load_norm - 0.9*solar_norm - 0.8*wind_norm` in the 1 MW equivalent illustrative microgrid. Each normalized input uses the fixed pre-2019 scale. These are national series transformed to a **synthetic microgrid**; do not infer actual national energy costs.
+- Causal one-hour features only use observed measurements at t-1, t-2, t-24, t-25, t-48, t-168 and hour, weekday, day-of-year cyclical clock features for t. No post-issue observations.
+- Component experts: three HistGradientBoostingRegressor models, `max_iter=180, max_leaf_nodes=25, learning_rate=0.06, l2_regularization=1, random_state=13`. Direct expert: LightGBM `n_estimators=260, num_leaves=25, learning_rate=0.05, min_child_samples=30, reg_lambda=2, random_state=13, n_jobs=3`.
+- Reconciliation base `b`, direct `d`, observed `y`. Global weight `alpha_0=clip(sum((d-b)*(y-b))/sum((d-b)^2),0,1)` from 2019 only. Regime weights `alpha_r=clip((sum_r((d-b)*(y-b)) + 0.5*sum_r((d-b)^2)*alpha_0)/(1.5*sum_r((d-b)^2)),0,1)` in three UTC tariff periods: hours 0–6 offpeak; 7–16, 22–23 daytime; 17–21 peak. When denominator is zero use alpha_0. The shrinkage factor 0.5 and groups are fixed before 2020. Prediction `b + alpha_r*(d-b)`. This is a specific regularized mixture of existing forecasting algorithms, not automatically a globally novel invention.
+- Day-ahead 24-hour target predictors use observations from t-24 or earlier; separate LightGBM with parameters as above, fitted 2015–2018.
+
+## Dispatch and baselines
+- Same 24-hour LP for all forecast-driven policies. Battery: 2 MWh, initial and daily terminal energy 1 MWh, range 0.3–1.8 MWh, charge/discharge <=0.75 MW, efficiencies 0.95, objective energy purchase with UTC prices $0.11/$0.18/$0.30 per kWh, export $0.055/kWh, throughput wear $15/MWh. Synthetic tariff, not claimed actual market data. Grid unconstrained. All actions determined by forecasts, actual balance settled ex-post with unlimited grid imports/exports; no forecast leakage.
+- Policies: `dayahead_lp` (plan once at midnight), `hourly_global` (hourly replan, current-hour replaced with global forecast), `hourly_regime` (hourly replan with tariff-gated reconciler), `budgeted_regime` (replan at midnight, noon or whenever `1000*buy_price*abs(regime_pred - day_ahead_pred)>=12 USD`; only remaining-horizon optimization). **No threshold tuning based on 2020.**
+- The primary forecast baseline is `global_reconcile`; the primary control baseline is `hourly_global`. Context includes component HGB, direct expert and day-ahead control. The output includes solve-count and no-lookahead perfect-foresight upper reference optionally omitted to control runtime.
+
+## Confirmatory outcomes and evidence thresholds
+- **Primary forecast:** `regime` versus `global_reconcile` RMSE in each country on 2020 aligned valid hourly test samples. Hypothesis: regime reduces squared error in both. Paired moving-block bootstrap (168-hour resampled blocks, 2000 replicates, seed 20261101) on the difference in squared-error, report 95% percentile interval. Strong two-country claim requires both intervals strictly below zero. Two primary countries; apply conservative Bonferroni 97.5% intervals as sensitivity.
+- **Primary economic:** `hourly_regime` versus `hourly_global`, paired daily difference in actual cost, 14-day block bootstrap (2000 resamples, seed 20261102). The primary claim requires each country's 95% confidence interval entirely below zero; report 97.5% sensitivity. No significant improvements may be inferred merely from differences in point estimates.
+- **Operational tradeoff:** `budgeted_regime` vs `hourly_regime` costs and optimizer calls; success criterion fewer than half the LP calls while retaining at least 90% of savings versus `dayahead_lp` in each country (when savings positive). This is secondary.
+- Missingness: exclude day if any of its 24 target hours or any requisite predictor for the evaluation are invalid, or predictions are missing. No imputation from future values, no manual day exclusion. Record counts. The source ends September 2020. No claimed climate portability beyond two countries.
+- **Failure is reportable.** If any primary criterion fails, retain the manuscript as exploratory/negative validation; do not rename the same 2020 data a fresh holdout or retune methods and cite as confirmatory.
+
+## Audit
+- Script and protocol frozen in a GitHub commit before validation. Keep GitHub commit SHA and Python package versions in outcome manifest.
+- Do not mutate source scripts or pre-registration after seeing 2020 labels. Any needed bug fix must be documented as a deviation and analyzed separately. No cherry-picking of best seeds, countries or months.
