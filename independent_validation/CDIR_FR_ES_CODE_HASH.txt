@@ -1,0 +1,5 @@
+Lock established before executing 2019 FR/ES forecast/control evaluation.
+52771902a7afa754be9d6666ca84dbb5738dd8a8e9aac4d98daecf5a70bacf84  frozen_experiment.py
+a639b68af5190f0b85a4d5a535b64286b7b2fdccffaa0a2adb77304686e22e24  PREREGISTRATION.md
+
+Source will be published after execution; any mismatch or post-lock patch must be disclosed.
